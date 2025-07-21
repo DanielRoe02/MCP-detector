@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>MCP Metadata Detector</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; }
+    pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>MCP Metadata Detector</h1>
+  <p>Upload a DALL·E or Adobe-generated image to inspect C2PA/MCP metadata.</p>
+  <input type="file" id="fileInput" accept="image/*">
+  <div id="result" style="margin-top: 2rem;"></div>
+
+  <script type="module">
+    import init, { readFile } from "https://cdn.jsdelivr.net/npm/c2pa-js@0.10.1/dist/browser/index.js";
+
+    window.onload = () => {
+      const fileInput = document.getElementById("fileInput");
+      const result = document.getElementById("result");
+
+      fileInput.addEventListener("change", async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        result.innerHTML = "Reading metadata...";
+
+        try {
+          await init();  // important to load the WebAssembly core
+          const arrayBuffer = await file.arrayBuffer();
+          const store = await readFile(new Uint8Array(arrayBuffer));
+
+          if (!store || store.claims.length === 0) {
+            result.innerHTML = "❌ No MCP or C2PA metadata found.";
+            return;
+          }
+
+          const claim = store.claims[0];
+          const metadata = {
+            Creator: claim.claimGenerator,
+            Created: claim.created,
+            Actions: claim.actions.map(a => a.action).join(', '),
+            Signature: store.signatureInfo?.issuer || "Unsigned"
+          };
+
+          result.innerHTML = `<h3>✅ Metadata Found:</h3><pre>${JSON.stringify(metadata, null, 2)}</pre>`;
+        } catch (err) {
+          result.innerHTML = `⚠️ Error: ${err.message}`;
+        }
+      });
+    };
+  </script>
+</body>
+</html>
