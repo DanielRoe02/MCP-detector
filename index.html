@@ -3,10 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <title>MCP Metadata Detector</title>
+  <script src="https://unpkg.com/exifreader@4.12.0/dist/exif-reader.min.js"></script>
   <style>
-    body { font-family: Arial, sans-serif; padding: 2rem; max-width: 700px; margin: auto; }
+    body { font-family: Arial, sans-serif; padding: 2rem; }
     input[type="file"] { margin-bottom: 1rem; }
-    pre { background: #f5f5f5; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    pre { background: #f5f5f5; padding: 1rem; border-radius: 6px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -15,13 +16,9 @@
   <input type="file" id="fileInput" accept="image/*" />
   <div id="result">No file uploaded yet.</div>
 
-  <script type="module">
-    import { createC2pa } from 'https://cdn.jsdelivr.net/npm/c2pa@0.5.3/+esm';
-
+  <script>
     const fileInput = document.getElementById('fileInput');
     const result = document.getElementById('result');
-
-    const c2pa = await createC2pa();
 
     fileInput.addEventListener('change', async () => {
       result.innerHTML = 'Reading metadata...';
@@ -29,14 +26,30 @@
       if (!file) return;
 
       try {
-        const manifest = await c2pa.read(file);
-        if (manifest) {
-          result.innerHTML = `<h2>C2PA Metadata Detected</h2><pre>${JSON.stringify(manifest, null, 2)}</pre>`;
+        const arrayBuffer = await file.arrayBuffer();
+        const tags = await ExifReader.load(arrayBuffer, { expanded: true });
+        let output = '<h2>Metadata Found:</h2><pre>';
+
+        const mcpKeys = Object.keys(tags).filter(key =>
+          key.toLowerCase().includes('c2pa') ||
+          key.toLowerCase().includes('xmp') ||
+          key.toLowerCase().includes('openai') ||
+          key.toLowerCase().includes('creator') ||
+          key.toLowerCase().includes('software')
+        );
+
+        if (mcpKeys.length === 0) {
+          output += 'No C2PA or MCP metadata detected.</pre>';
         } else {
-          result.innerHTML = 'No C2PA / MCP metadata found in this file.';
+          mcpKeys.forEach(key => {
+            output += `${key}:\n${JSON.stringify(tags[key], null, 2)}\n\n`;
+          });
+          output += '</pre>';
         }
+
+        result.innerHTML = output;
       } catch (err) {
-        result.innerHTML = 'Error reading metadata: ' + err.message;
+        result.innerHTML = '<pre style="color: red;">Error reading metadata: ' + err.message + '</pre>';
       }
     });
   </script>
